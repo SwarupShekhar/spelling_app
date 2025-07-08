@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import wordList from '../Data/words.json';
 
 function getRandomWords(arr, n) {
@@ -51,14 +51,14 @@ const Confetti = ({ show }) => {
 };
 
 const TypingPracticeBox = () => {
-  // Session words state
-  const [sessionWords, setSessionWords] = useState(() => getRandomWords(wordList, SESSION_WORD_COUNT));
-  // Pick a random word from sessionWords on load
-  const [selectedWord, setSelectedWord] = useState(() => sessionWords[Math.floor(Math.random() * sessionWords.length)]);
+  const [masteredWords, setMasteredWords] = useState([]);
+  const [selectedWord, setSelectedWord] = useState(() => {
+    const nonMastered = wordList.filter(w => !masteredWords.includes(w.term));
+    return nonMastered[Math.floor(Math.random() * nonMastered.length)];
+  });
   const [input, setInput] = useState('');
   const [correctCount, setCorrectCount] = useState(0);
   const [feedback, setFeedback] = useState('');
-  const [masteredWords, setMasteredWords] = useState([]);
   const [showHint, setShowHint] = useState(false);
   const [streak, setStreak] = useState(0);
   const [totalAttempts, setTotalAttempts] = useState(0);
@@ -69,34 +69,24 @@ const TypingPracticeBox = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const sessionStart = useRef(Date.now());
 
-  // On restart, pick new session words and a random selected word
-  const handleRestart = () => {
-    const newSessionWords = getRandomWords(wordList, SESSION_WORD_COUNT);
-    setSessionWords(newSessionWords);
-    setSelectedWord(newSessionWords[Math.floor(Math.random() * newSessionWords.length)]);
+  // Pick a random non-mastered word
+  const pickRandomWord = () => {
+    const nonMastered = wordList.filter(w => !masteredWords.includes(w.term));
+    if (nonMastered.length === 0) return;
+    let randomWord;
+    do {
+      randomWord = nonMastered[Math.floor(Math.random() * nonMastered.length)];
+    } while (randomWord.term === selectedWord.term && nonMastered.length > 1);
+    setSelectedWord(randomWord);
     setInput('');
     setCorrectCount(0);
     setFeedback('');
-    setMasteredWords([]);
     setShowHint(false);
     setStreak(0);
-    setTotalAttempts(0);
-    setBestStreak(0);
-    setSessionEnded(false);
-    setWordAttempts({});
-    setWordCorrectCounts({});
-    setShowConfetti(false);
-    sessionStart.current = Date.now();
   };
 
-  // On mount, ensure selectedWord is random from sessionWords
-  useEffect(() => {
-    setSelectedWord(sessionWords[Math.floor(Math.random() * sessionWords.length)]);
-    // eslint-disable-next-line
-  }, []);
-
-  // Confetti effect when streak reaches 10
-  useEffect(() => {
+  // Confetti effect when streak reaches 10 or word is mastered
+  React.useEffect(() => {
     if (streak === 10) {
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 3500);
@@ -130,20 +120,22 @@ const TypingPracticeBox = () => {
       setWordCorrectCounts(prev => {
         const newCount = (prev[selectedWord.term] || 0) + 1;
         const updated = { ...prev, [selectedWord.term]: newCount };
-        // If 10 completions, reset mastered state and attempts for this word
+        // If 10 completions, mark as mastered and show confetti
         if (newCount === 10) {
           setTimeout(() => {
-            setMasteredWords(mw => mw.filter(w => w !== selectedWord.term));
+            setMasteredWords(mw => [...mw, selectedWord.term]);
             setWordAttempts(wa => ({ ...wa, [selectedWord.term]: 0 }));
             setWordCorrectCounts(wc => ({ ...wc, [selectedWord.term]: 0 }));
-          }, 3500); // after confetti
+            setShowConfetti(true);
+            setTimeout(() => setShowConfetti(false), 2500);
+          }, 3500); // after streak confetti
         }
         return updated;
       });
       if (!masteredWords.includes(selectedWord.term)) {
         const newMastered = [...masteredWords, selectedWord.term];
         setMasteredWords(newMastered);
-        if (newMastered.length === sessionWords.length) {
+        if (newMastered.length === wordList.length) {
           setSessionEnded(true);
         }
       }
@@ -166,41 +158,8 @@ const TypingPracticeBox = () => {
     }
   };
 
-  const handleSelect = (e) => {
-    const selected = sessionWords.find((w) => w.term === e.target.value);
-    setSelectedWord(selected);
-    setInput('');
-    setCorrectCount(0);
-    setFeedback('');
-    setShowHint(false);
-    setStreak(0);
-    // Show current attempts for the selected word
-    const currentAttempts = wordAttempts[selected.term] || 0;
-    if (currentAttempts > 0) {
-      setFeedback(`Attempts for this word: ${currentAttempts}/10`);
-    }
-  };
-
-  const handleRandomWord = () => {
-    let randomWord;
-    do {
-      randomWord = sessionWords[Math.floor(Math.random() * sessionWords.length)];
-    } while (randomWord.term === selectedWord.term && sessionWords.length > 1);
-    setSelectedWord(randomWord);
-    setInput('');
-    setCorrectCount(0);
-    setFeedback('');
-    setShowHint(false);
-    setStreak(0);
-    // Show current attempts for the selected word
-    const currentAttempts = wordAttempts[randomWord.term] || 0;
-    if (currentAttempts > 0) {
-      setFeedback(`Attempts for this word: ${currentAttempts}/10`);
-    }
-  };
-
   // Progress calculation
-  const progressPercent = Math.min((correctCount / SESSION_WORD_COUNT) * 100, 100);
+  const progressPercent = Math.min((correctCount / wordList.length) * 100, 100);
   const accuracy = totalAttempts > 0 ? Math.round((correctCount / totalAttempts) * 100) : 100;
   const timeTaken = Math.floor((Date.now() - sessionStart.current) / 1000);
   const minutes = Math.floor(timeTaken / 60);
@@ -213,55 +172,56 @@ const TypingPracticeBox = () => {
       {sessionEnded && (
         <div className="session-summary-overlay">
           <div className="session-summary">
-            <h2>🎉 Session Complete!</h2>
+            <h2>🎉 All Words Mastered!</h2>
             <p><strong>Accuracy:</strong> {accuracy}%</p>
             <p><strong>Time Taken:</strong> {minutes}m {seconds}s</p>
-            <p><strong>Words Mastered:</strong> {masteredWords.length} / {SESSION_WORD_COUNT}</p>
+            <p><strong>Words Mastered:</strong> {masteredWords.length} / {wordList.length}</p>
             <p><strong>Best Streak:</strong> {bestStreak}</p>
-            <button className="restart-btn" onClick={handleRestart}>Restart Session</button>
+            <button className="restart-btn" onClick={() => window.location.reload()}>Restart</button>
           </div>
         </div>
       )}
 
-      {/* Word List Sidebar */}
-      <div className="word-list">
+      {/* Magical Vertical Slider/List */}
+      <div className="word-list magical-slider">
         <h4 className="word-list-title">Word List</h4>
         <ul>
           {wordList.map((word) => {
-            const isSession = sessionWords.some(w => w.term === word.term);
             const isMastered = masteredWords.includes(word.term);
             const isSelected = selectedWord.term === word.term;
             return (
               <li
                 key={word.term}
-                className={`word-list-item${isSession ? ' session-word' : ''}${isMastered ? ' mastered' : ' pending'}${isSelected ? ' selected' : ''}`}
+                className={`word-list-item${isMastered ? ' mastered' : ' pending'}${isSelected ? ' selected magical-glow' : ''}`}
                 style={{
                   fontWeight: isSelected ? 'bold' : 'normal',
-                  filter: isSelected ? 'none' : isSession ? 'blur(0.5px)' : 'blur(2.5px)',
-                  opacity: isSelected ? 1 : isSession ? 0.85 : 0.4,
-                  cursor: isSession ? 'pointer' : 'not-allowed',
-                  pointerEvents: isSession ? 'auto' : 'none',
-                  background: isSelected ? '#e3f2fd' : isSession ? 'rgba(255,255,255,0.7)' : 'none',
+                  filter: isSelected ? 'none' : 'blur(2.5px)',
+                  opacity: isSelected ? 1 : 0.4,
+                  cursor: 'pointer',
+                  background: isSelected ? '#e3f2fd' : 'none',
                   position: 'relative',
-                  transition: 'all 0.2s',
+                  transition: 'all 0.3s cubic-bezier(.17,.67,.83,.67)',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   maxWidth: '180px',
                 }}
-                onClick={isSession ? () => {
+                onClick={() => {
                   setSelectedWord(word);
                   setShowHint(false);
                   setStreak(0);
-                } : undefined}
-                title={isSession ? 'Practice this word' : 'Not in this session'}
+                }}
+                title={word.term}
               >
-                {isSession && <span style={{color:'#ffd600', marginRight:4}} title="Session word">🪄</span>}
+                {isSelected && <span className="magic-wand" style={{color:'#ffd600', marginRight:4}} title="Current word">🪄</span>}
                 {isMastered ? '✅' : '•'} {word.term}
               </li>
             );
           })}
         </ul>
+        <button className="random-word-btn" onClick={pickRandomWord} title="Pick a random word!">
+          🎲 Random Word
+        </button>
       </div>
 
       {/* Main Practice Card */}
@@ -270,15 +230,15 @@ const TypingPracticeBox = () => {
         <div className="word-select-row">
           <div className="word-select-group">
             <label className="word-select-label" htmlFor="word-select">Select a word to practice:</label>
-            <select id="word-select" onChange={handleSelect} value={selectedWord.term} className="word-select">
-              {sessionWords.map((word, i) => (
+            <select id="word-select" onChange={e => setSelectedWord(wordList.find(w => w.term === e.target.value))} value={selectedWord.term} className="word-select">
+              {wordList.map((word, i) => (
                 <option key={i} value={word.term}>
                   {word.term}
                 </option>
               ))}
             </select>
           </div>
-          <button className="random-word-btn" onClick={handleRandomWord} title="Practice a random word">
+          <button className="random-word-btn" onClick={pickRandomWord} title="Pick a random word!" disabled={sessionEnded}>
             🎲 Random Word
           </button>
         </div>
@@ -290,7 +250,7 @@ const TypingPracticeBox = () => {
             style={{ width: `${progressPercent}%` }}
           ></div>
           <span className="progress-bar-label">
-            {correctCount} / {SESSION_WORD_COUNT} mastered
+            {correctCount} / {wordList.length} mastered
           </span>
         </div>
 
