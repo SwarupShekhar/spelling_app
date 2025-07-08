@@ -1,23 +1,20 @@
-import logo from './logo.svg';
+import React, { useState } from 'react';
 import './App.css';
+import TypingPracticeBox from './components/TypingPracticeBox';
 
 function App() {
+  const [theme, setTheme] = useState('light');
+  const toggleTheme = () => setTheme(theme === 'light' ? 'dark' : 'light');
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className={`App ${theme}`}>
+      <button className="theme-toggle-btn" onClick={toggleTheme} title="Toggle dark/light mode">
+        {theme === 'light' ? '🌙 Dark Mode' : '☀️ Light Mode'}
+      </button>
+      <h1 className="main-heading">
+        Master of Spells <span role="img" aria-label="magic wand">🪄</span>
+      </h1>
+      <TypingPracticeBox theme={theme} />
     </div>
   );
 }
