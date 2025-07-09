@@ -51,10 +51,14 @@ const Confetti = ({ show }) => {
 };
 
 const TypingPracticeBox = () => {
+  // Session logic: 10 random non-mastered words
   const [masteredWords, setMasteredWords] = useState([]);
-  const [selectedWord, setSelectedWord] = useState(() => {
+  const [sessionWords, setSessionWords] = useState(() => {
     const nonMastered = wordList.filter(w => !masteredWords.includes(w.term));
-    return nonMastered[Math.floor(Math.random() * nonMastered.length)];
+    return getRandomWords(nonMastered, 10);
+  });
+  const [selectedWord, setSelectedWord] = useState(() => {
+    return sessionWords[Math.floor(Math.random() * sessionWords.length)];
   });
   const [input, setInput] = useState('');
   const [correctCount, setCorrectCount] = useState(0);
@@ -69,14 +73,13 @@ const TypingPracticeBox = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const sessionStart = useRef(Date.now());
 
-  // Pick a random non-mastered word
+  // Pick a random word from sessionWords
   const pickRandomWord = () => {
-    const nonMastered = wordList.filter(w => !masteredWords.includes(w.term));
-    if (nonMastered.length === 0) return;
+    if (sessionWords.length === 0) return;
     let randomWord;
     do {
-      randomWord = nonMastered[Math.floor(Math.random() * nonMastered.length)];
-    } while (randomWord.term === selectedWord.term && nonMastered.length > 1);
+      randomWord = sessionWords[Math.floor(Math.random() * sessionWords.length)];
+    } while (randomWord.term === selectedWord.term && sessionWords.length > 1);
     setSelectedWord(randomWord);
     setInput('');
     setCorrectCount(0);
@@ -158,8 +161,9 @@ const TypingPracticeBox = () => {
     }
   };
 
-  // Progress calculation
-  const progressPercent = Math.min((correctCount / wordList.length) * 100, 100);
+  // Progress calculation (out of 10 session words)
+  const sessionMastered = sessionWords.filter(w => masteredWords.includes(w.term)).length;
+  const progressPercent = Math.min((sessionMastered / 10) * 100, 100);
   const accuracy = totalAttempts > 0 ? Math.round((correctCount / totalAttempts) * 100) : 100;
   const timeTaken = Math.floor((Date.now() - sessionStart.current) / 1000);
   const minutes = Math.floor(timeTaken / 60);
@@ -175,7 +179,7 @@ const TypingPracticeBox = () => {
             <h2>🎉 All Words Mastered!</h2>
             <p><strong>Accuracy:</strong> {accuracy}%</p>
             <p><strong>Time Taken:</strong> {minutes}m {seconds}s</p>
-            <p><strong>Words Mastered:</strong> {masteredWords.length} / {wordList.length}</p>
+            <p><strong>Words Mastered:</strong> {sessionMastered} / 10</p>
             <p><strong>Best Streak:</strong> {bestStreak}</p>
             <button className="restart-btn" onClick={() => window.location.reload()}>Restart</button>
           </div>
@@ -230,8 +234,8 @@ const TypingPracticeBox = () => {
         <div className="word-select-row">
           <div className="word-select-group">
             <label className="word-select-label" htmlFor="word-select">Select a word to practice:</label>
-            <select id="word-select" onChange={e => setSelectedWord(wordList.find(w => w.term === e.target.value))} value={selectedWord.term} className="word-select">
-              {wordList.map((word, i) => (
+            <select id="word-select" onChange={e => setSelectedWord(sessionWords.find(w => w.term === e.target.value))} value={selectedWord.term} className="word-select">
+              {sessionWords.map((word, i) => (
                 <option key={i} value={word.term}>
                   {word.term}
                 </option>
@@ -250,7 +254,7 @@ const TypingPracticeBox = () => {
             style={{ width: `${progressPercent}%` }}
           ></div>
           <span className="progress-bar-label">
-            {correctCount} / {wordList.length} mastered
+            {sessionMastered} / 10 mastered
           </span>
         </div>
 
@@ -294,6 +298,8 @@ const TypingPracticeBox = () => {
           ✅ Correct attempts: <strong>{correctCount}</strong>
         </div>
       </div>
+      {/* Creator credit box */}
+      <div className="creator-credit">Created by Swarup Shekhar</div>
     </div>
   );
 };
